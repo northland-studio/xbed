@@ -2,6 +2,9 @@
   "name": "@xbed/api",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -12,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^11.10.0",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.1",
     "multer": "^1.4.5-lts.1",

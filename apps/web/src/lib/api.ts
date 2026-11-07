@@ -83,10 +83,12 @@ interface RequestOptions {
   silent?: boolean;
   /** 401 时不触发全局跳转（如 /auth/me 探测） */
   skipAuthRedirect?: boolean;
+  /** 保留后端原始 key（不转 camelCase），用于需要原样回写的系统设置等 */
+  rawKeys?: boolean;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, form, signal, silent, skipAuthRedirect } = options;
+  const { method = 'GET', body, form, signal, silent, skipAuthRedirect, rawKeys } = options;
   const headers: Record<string, string> = { Accept: 'application/json' };
   let payload: BodyInit | undefined;
 
@@ -128,7 +130,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     data = text || null;
   }
 
-  const normalized = normalizeKeys(data);
+  const normalized = rawKeys ? data : normalizeKeys(data);
 
   if (!res.ok) {
     const errObj = (normalized as { error?: { code?: string; message?: string } } | null)?.error;

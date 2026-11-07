@@ -89,7 +89,7 @@ export function EmailVerifyBox({
       <Alert kind="warn">
         邮箱尚未验证。验证完成前无法报名参赛。邮箱不用于登录，也不会向其他玩家公开。
       </Alert>
-      <div className="form-grid">
+      <div className="stack">
         <Field label="邮箱地址" required hint="用于接收赛事通知与验证码">
           <input
             className="input"
@@ -100,25 +100,24 @@ export function EmailVerifyBox({
             autoComplete="email"
           />
         </Field>
-        <Field label="验证码" required hint={sent ? '验证码已发送，请填写 6 位数字' : '点击右侧按钮获取验证码'}>
-          <div className="row">
-            <input
-              className="input"
-              value={code}
-              placeholder="6 位验证码"
-              inputMode="numeric"
-              onChange={(e) => setCode(e.target.value)}
-            />
-            <Btn
-              variant="outline"
-              onClick={() => void send()}
-              loading={sending}
-              disabled={cooldown > 0}
-              className="nowrap"
-            >
-              {cooldown > 0 ? `${cooldown}s 后重发` : '发送验证码'}
-            </Btn>
-          </div>
+        <Field label="验证码" required hint={sent ? '验证码已发送，请填写 6 位数字' : '点击下方按钮获取验证码'}>
+          <input
+            className="input"
+            value={code}
+            placeholder="6 位验证码"
+            inputMode="numeric"
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Btn
+            variant="outline"
+            onClick={() => void send()}
+            loading={sending}
+            disabled={cooldown > 0}
+            className="nowrap"
+            block
+          >
+            {cooldown > 0 ? `${cooldown}s 后重发` : '发送验证码'}
+          </Btn>
         </Field>
       </div>
       <div className="row">

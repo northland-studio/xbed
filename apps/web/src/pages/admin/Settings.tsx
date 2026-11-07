@@ -44,7 +44,10 @@ export function AdminSettingsPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin', 'settings'],
     queryFn: async () => {
-      const res = await get<{ items?: SystemSetting[]; settings?: Record<string, string> }>('/admin/settings');
+      // 保留后端原始 key（如 evidence_deadline_minutes），避免 camelCase 转换后回写失败
+      const res = await get<{ items?: SystemSetting[]; settings?: Record<string, string> }>('/admin/settings', undefined, {
+        rawKeys: true,
+      });
       const map: Record<string, string> = {};
       if (res.settings && typeof res.settings === 'object') {
         Object.entries(res.settings).forEach(([k, v]) => {
