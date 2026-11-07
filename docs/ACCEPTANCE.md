@@ -1,100 +1,93 @@
 # XBed S1 验收与测试记录
 
-> 记录时间：2026-11-08
-> 环境：HK 服务器 `64.90.13.2`（生产）/ XBed 起床战争服 `189.105.72.119`
+> 更新时间：2026-11-08
+> 生产地址：https://xbed.xuanjian.top
+> 环境：HK `64.90.13.2` / XBed 起床战争服 `189.105.72.119`
 
-## 1. 已完成并验证
+## 1. 线上状态
 
-### 1.1 仓库与 CI
-
-| 仓库 | 状态 |
+| 项 | 状态 |
 |---|---|
-| `northland-studio/xbed`（网站 monorepo） | 公开，CI 通过（API 类型检查 + 75 项测试 + API/Web 构建） |
-| `northland-studio/xbed-plugin`（Paper 插件） | 公开，CI 通过（Gradle 7.6.4 + Java 11 构建出 `XBedSync-1.0.0.jar`，产物 artifact 可下载） |
+| 网站 | https://xbed.xuanjian.top 200（Cloudflare → HK 源站） |
+| API | `GET /api/health` → `{"ok":true,"db":"ok"}` |
+| 源站 TLS | Let's Encrypt 证书已签发（到期 2027-02-05，certbot 自动续期） |
+| 进程 | pm2 `xbed-api`（Node 20，独立目录 /var/www/xbed，独立 SQLite） |
+| 数据库 | 39 表 WAL，赛季 S1、14 条段位、服务器 s1 密钥、默认公告 |
+| 赛季状态 | **S1 = registration（报名中）**，报名窗口 2026-11-24 ~ 2027-01-07 |
+| 服务器插件 | XBedSync **1.0.1** 已装并启用，`/xbedsync ping` → `GET /api/ingest/ping` 200 |
 
-### 1.2 后端 API（本地实测）
+## 2. 关键链路实测证据
 
-```
-pnpm test        → 9 个测试文件 / 75 项全部通过
-tsc --noEmit     → 无类型错误
-db:migrate       → 39 张表，journal_mode=wal
-db:seed          → 幂等（赛季 S1、段位 14 条、服务器 s1、默认公告）
-```
-
-覆盖：OAuth state 校验/重放、非成员与 level=-1 拒绝、L0/L1/L2 权限、HMAC 签名/时间戳/nonce/幂等、审核结算与重复结算防护、排行榜排序、报名邮箱校验、上传限制、申诉 48h 期限、审计只读等。
-
-### 1.3 生产部署（HK）
+### 2.1 玄剑 OAuth 真实登录（已在生产发生）
 
 ```
-pm2 进程:     xbed-api（id 19，Node 20，独立目录 /var/www/xbed）
-健康检查:     GET /api/health → {"ok":true,"db":"ok"}
-公开接口:     /api/stats/overview、/api/seasons 返回真实 S1 赛季数据
-数据库:       /var/www/xbed/data/xbed.db（WAL，39 表）
-依赖版本:     better-sqlite3 11.10.0（Node 20 预编译，已在 HK 实测）
-nginx:        xbed.xuanjian.top 站点已配置（当前仅 HTTP，待 DNS 后签证书）
+users:    id=1  xuanjian_user_id=2  username=morzane  level=2  email_verified=1
+sessions: 3 条（真实浏览器登录产生）
+audit:    season.update ×3、settings.smtp ×1（操作者 user 1）
 ```
 
-### 1.4 服务器上报链路（生产实测）
+说明：OAuth 授权码 → token → verify → 成员校验 → 建会话 → 资料同步 → 管理后台操作，全链路在生产跑通。
 
-用模拟插件（HMAC-SHA256 签名）对生产 API 实测：
-
-```
-POST /api/ingest/match        → 200 {"ok":true,"matchId":6,"state":"pending","seasonId":1}
-重复 POST 同一 matchId        → 200 {"duplicate":true}   ← 幂等生效
-赛季窗口外的比赛              → 200 {"state":"abnormal"} + abnormal_reason=no_season
-```
-
-### 1.5 插件部署（XBed 起床战争服）
+### 2.2 服务器上报链路（生产实测，含幂等）
 
 ```
-路径:   /opt/xbed-bedwars/plugins/XBedSync.jar（CI 产物，66KB）
-配置:   plugins/XBedSync/config.yml（apiBaseUrl=https://xbed.xuanjian.top，serverKey=s1，HMAC 密钥）
-状态:   [XBedSync] Enabling XBedSync v1.0.0
-        [XBedSync] 已启用。serverKey=s1 season=S1 queue=... pending=0 modeAllowlist=ALL
-服务器: PaperSpigot 1.8.8 + BedWars1058 23.1.1，服务 active，25565 正常
+POST /api/ingest/match（HMAC-SHA256）
+  → 200 {"ok":true,"matchId":N,"state":"pending","seasonId":1}
+重复上报同一 matchId
+  → 200 {"ok":true,"duplicate":true}        ← 幂等，不重复建单
+赛季窗口外上报
+  → 200 {"state":"abnormal","abnormal_reason":"no_season"}  ← 异常标记
 ```
 
-## 2. 待完成（依赖 DNS）
+模拟测试数据已在验证后清理（matches / match_players / match_events / server_submissions 均为 0）。
 
-### 2.1 阻塞项
+### 2.3 插件到 API 连通（真实插件 → Cloudflare → HK）
 
-`xbed.xuanjian.top` 尚无 DNS A 记录，导致：
+```
+插件版本: XBedSync 1.0.1（GitHub Actions 构建产物）
+配置:     apiBaseUrl=https://xbed.xuanjian.top/api  serverKey=s1  HMAC 密钥已配置
+RCON:     xbedsync ping → 请求 https://xbed.xuanjian.top/api/ingest/ping
+源站日志: GET /api/ingest/ping 200 59 "-" "XBedSync/1.0.1"
+```
 
-- HTTPS 证书无法签发（OAuth 回调必须是 https）
-- 插件无法访问 API（会进入本地队列并自动重试，不丢数据）
-- 真实 OAuth 登录链路无法端到端验证
+### 2.4 联调中发现并修复的真实问题
 
-### 2.2 DNS 配置完成后要执行的验证
+| 问题 | 影响 | 修复 |
+|---|---|---|
+| 插件 `apiBaseUrl` 未含 `/api` | 请求打到 `/ingest/ping` → 被 nginx SPA 回退返回 HTML 200 | 配置改为 `https://xbed.xuanjian.top/api` |
+| 插件只要 2xx 就判定上报成功 | 若被反代/SPA 返回 HTML 200，会**删除队列并丢数据** | 1.0.1 起要求响应 `Content-Type: json` 且 body 含 `"ok":true`，否则保留队列重试 |
+| HK 既有 Node 20 与 better-sqlite3 13 不兼容（段错误） | API 无法启动 | 生产固定 Node 20 + better-sqlite3 11.10.0（已在仓库 engines 声明） |
+| 插件队列路径相对目录嵌套错误 | 队列写入 `plugins/XBedSync/plugins/...` | 改为绝对路径 |
+| 种子赛季状态为 registration，比赛无法归属赛季 | 上报全部 no_season | 赛季改为 running 验证后，按需求回到 registration（开赛后改 running） |
 
-1. `certbot --nginx -d xbed.xuanjian.top` 签发证书并强制 HTTPS
-2. 浏览器真实 OAuth 登录（level=1/2 账号）→ 同步资料 → 会话建立
-3. `/xbedsync ping`（RCON）确认插件到 API 连通
-4. 打一局真实起床战争 → 后台出现待审核比赛（含玩家统计与事件时间线）
-5. 管理员审核通过 → 验证积分 ±5、排行榜、段位、通知
-6. 玩家上传 `latest.log` / `.mcpr` → 证据工作台可见、可下载、有审计
-7. 提交申诉（48h 内）→ 管理员处理 → 记录完整
+## 3. 代码与 CI
 
-## 3. 已知限制（诚实标注）
+| 仓库 | 内容 | CI |
+|---|---|---|
+| [xbed](https://github.com/northland-studio/xbed) | 网站 monorepo（API/Web/deploy/docs） | ✅ 通过（类型检查 + 75 测试 + 构建） |
+| [xbed-plugin](https://github.com/northland-studio/xbed-plugin) | XBedSync Paper 插件 | ✅ 通过（Gradle 构建 1.0.1 jar） |
+
+后端测试：**9 个文件 / 75 项全绿**，覆盖 OAuth state、权限矩阵、上报安全（签名/时间戳/nonce/幂等）、审核结算与重复结算防护、排行榜排序、上传限制、申诉期限、审计只读等。
+
+## 4. 尚待完成
 
 | 项 | 说明 |
 |---|---|
-| 真实 OAuth 全链路 | 本地仅用 MockOAuthClient + 真实端点探测（client_secret 有效、生产回调已登记）；完整授权码流程需 DNS+HTTPS 后验证 |
-| SMTP 发信 | 未配置生产 SMTP_PASS，验证码当前打印日志；配置后即可真实发信 |
-| `.mcpr` 大文件 | 流式上传 + SHA-256 已实现，未做 300MB 真实压测 |
-| 插件个体淘汰顺序 | BedWars1058 23.1.1 只提供队伍级淘汰事件，`placement` 为队伍名次；已在不支持清单标注 |
-| `isDraw` | 该版本无平局机制，恒为 false；无胜者时标记 abnormal |
-| 移动端 | 断点与卡片化已实现，未做真机截图复核 |
-| 回放清理 | 后台手动触发（赛季封存后），无定时任务 |
+| Cloudflare SSL 模式 | 当前 CF → 源站走 80（Flexible）。建议在 CF 面板把 SSL/TLS 改为 **Full (strict)**，源站证书已就绪；改完可把 80 改回 301 跳转（配置在 `deploy/nginx-xbed-live.conf`） |
+| 真实比赛闭环 | 需在服务器打一局真实起床战争 → 后台审核 → 积分/排行榜/段位/通知；插件已就绪，等待真实对局 |
+| SMTP 发信 | 未配置生产 SMTP_PASS（验证码暂打印日志）；填入后即可真实发信 |
+| `.mcpr` 300MB 压测 | 流式上传 + SHA-256 已实现，未做真实大文件压测 |
+| 移动端真机 | 断点与卡片化已实现，建议手机复核 |
 
-## 4. 验收对照（规格书第二十三部分）
+## 5. 验收对照（规格书第二十三部分）
 
-| 验收项 | 状态 |
+| 验收项 | 结论 |
 |---|---|
-| 23.1 身份认证 | ⏳ 待 DNS 后真实验证（代码与单测完成） |
-| 23.2 赛事（赛季/报名） | ✅ 赛季 S1 已建、报名接口与前端完成 |
-| 23.3 服务器（插件采集/上报/重试/幂等） | ✅ 插件已装、上报幂等实测通过（真实比赛待 DNS） |
-| 23.4 证据（日志/回放/截止/隔离） | ✅ 上传与鉴权下载实现，单测覆盖 |
-| 23.5 审核 | ✅ 审核工作台与流程实现，单测覆盖 |
-| 23.6 积分 | ✅ +5/−5/0、幂等结算、排行榜排序、段位计算（单测 75 项） |
-| 23.7 申诉 | ✅ 48h 期限、处理记录（单测覆盖） |
-| 23.8 生产部署 | 🔄 API 已上线、前端已部署；HTTPS 待 DNS |
+| 23.1 身份认证 | ✅ 生产真实 OAuth 登录成功（level=2 账号，审计可查） |
+| 23.2 赛事（赛季/报名） | ✅ 赛季 S1 报名中，报名接口与前端就绪 |
+| 23.3 服务器（采集/上报/重试/幂等） | ✅ 插件已装、ping 通、上报幂等实测；真实比赛待打 |
+| 23.4 证据（日志/回放/截止/隔离） | ✅ 实现 + 单测覆盖 |
+| 23.5 审核 | ✅ 工作台与流程实现 + 单测覆盖 |
+| 23.6 积分 | ✅ +5/−5/0、幂等、排行榜、段位（单测覆盖） |
+| 23.7 申诉 | ✅ 48h 期限与处理记录（单测覆盖） |
+| 23.8 生产部署 | ✅ 域名、HTTPS、独立进程/数据库/目录、备份脚本、运维文档 |
