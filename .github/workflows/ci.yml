@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -7,32 +7,7 @@ on:
 
 jobs:
   api:
-    name: API 鏋勫缓涓庢祴璇?    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: 瀹夎渚濊禆
-        run: pnpm install --frozen-lockfile=false
-
-      - name: 绫诲瀷妫€鏌ヤ笌娴嬭瘯
-        working-directory: apps/api
-        run: |
-          pnpm exec tsc -p tsconfig.json --noEmit
-          pnpm test
-
-      - name: 鏋勫缓 API
-        working-directory: apps/api
-        run: pnpm build
-
-  web:
-    name: Web 鏋勫缓
+    name: API 构建与测试
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +19,35 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: 瀹夎渚濊禆
+      - name: 安装依赖
         run: pnpm install --frozen-lockfile=false
 
-      - name: 鏋勫缓鍓嶇
-        working-directory: apps/web
+      - name: 类型检查与测试
+        working-directory: apps/api
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm test
+
+      - name: 构建 API
+        working-directory: apps/api
         run: pnpm build
 
+  web:
+    name: Web 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile=false
+
+      - name: 构建前端
+        working-directory: apps/web
+        run: pnpm build
