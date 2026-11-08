@@ -18,3 +18,5 @@ data/
 coverage/
 *.mcpr
 *.latest.log
+
+.deploy-tmp/
