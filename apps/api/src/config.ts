@@ -48,6 +48,11 @@ export interface OAuthConfig {
   configured: boolean;
 }
 
+/** 玄剑官网（同源站点）地址，用于查询成员皮肤等站内数据 */
+export interface SiteConfig {
+  baseUrl: string;
+}
+
 export interface LimitsConfig {
   uploadMaxLogBytes: number;
   uploadMaxReplayBytes: number;
@@ -69,6 +74,7 @@ export interface AppConfig {
   cookieSecure: boolean;
   trustProxy: boolean;
   oauth: OAuthConfig;
+  site: SiteConfig;
   smtp: SmtpConfig | null;
   limits: LimitsConfig;
   /** 仅开发环境：允许 /api/auth/mock-login 建会话 */
@@ -135,6 +141,8 @@ export function createConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const clientId = (env.XUANJIAN_CLIENT_ID || '').trim();
   const clientSecret = (env.XUANJIAN_CLIENT_SECRET || '').trim();
   const providerUrl = (env.XUANJIAN_PROVIDER_URL || 'https://www.xuanjian.top').replace(/\/+$/, '');
+  // 站内数据（皮肤等）查询地址：生产建议写内网 http://127.0.0.1:3000，避免走公网
+  const siteBaseUrl = (env.XUANJIAN_SITE_URL || providerUrl).replace(/\/+$/, '');
 
   const smtpHost = (env.SMTP_HOST || '').trim();
   const smtp: SmtpConfig | null = smtpHost
@@ -171,6 +179,9 @@ export function createConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       configured: Boolean(clientId && clientSecret),
     },
     smtp,
+    site: {
+      baseUrl: siteBaseUrl,
+    },
     limits: {
       uploadMaxLogBytes: Math.round(num(env.UPLOAD_MAX_LOG_MB, 20) * MB),
       uploadMaxReplayBytes: Math.round(num(env.UPLOAD_MAX_MCPR_MB, 300) * MB),

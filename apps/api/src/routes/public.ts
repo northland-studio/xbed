@@ -12,6 +12,7 @@ import type {
   UserRow,
 } from '../db/models.js';
 import { errors } from '../lib/errors.js';
+import { asyncRoute } from '../middleware/error.js';
 import { listResponse, parseId, parseOptionalInt, parsePagination } from '../lib/pagination.js';
 import { asBool, parseJson } from '../lib/serialize.js';
 import {
@@ -448,6 +449,79 @@ export function createPublicRouter(ctx: AppContext): Router {
       seasonId: season?.id ?? null,
     });
   });
+
+  // ===== 皮肤代理（数据来自玄剑官网 /api/skins/lookup，64x64 PNG）=====
+  const skinCache = new Map<string, { expiresAt: number; contentType: string; body: Buffer }>();
+  const skinMissingCache = new Map<string, number>();
+  const SKIN_TTL_MS = 24 * 60 * 60 * 1000;
+  const SKIN_MISS_TTL_MS = 10 * 60 * 1000;
+
+  router.get(
+    '/skin/:gameId',
+    asyncRoute(async (req, res) => {
+      const gameId = String(req.params.gameId || '').trim();
+      if (!/^[A-Za-z0-9_]{2,32}$/.test(gameId)) {
+        res.status(404).json({ error: 'skin_not_found' });
+        return;
+      }
+      const key = gameId.toLowerCase();
+      const now = Date.now();
+
+      const cached = skinCache.get(key);
+      if (cached && cached.expiresAt > now) {
+        res.set('Content-Type', cached.contentType);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.send(cached.body);
+        return;
+      }
+      const missingUntil = skinMissingCache.get(key);
+      if (missingUntil && missingUntil > now) {
+        res.status(404).json({ error: 'skin_not_found' });
+        return;
+      }
+
+      const base = ctx.config.site.baseUrl;
+      let lookup: { skin?: string | null; exists?: boolean } | null = null;
+      try {
+        const lookupRes = await fetch(`${base}/api/skins/lookup?gameId=${encodeURIComponent(gameId)}`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (lookupRes.status === 429) {
+          res.status(503).json({ error: 'skin_service_busy' });
+          return;
+        }
+        if (!lookupRes.ok) throw new Error(`lookup_http_${lookupRes.status}`);
+        lookup = (await lookupRes.json()) as { skin?: string | null; exists?: boolean };
+      } catch {
+        // 官网不可用：不缓存失败结果，下次重试
+        res.status(503).json({ error: 'skin_service_unavailable' });
+        return;
+      }
+
+      if (!lookup || !lookup.skin) {
+        skinMissingCache.set(key, Date.now() + SKIN_MISS_TTL_MS);
+        res.status(404).json({ error: 'skin_not_found', exists: Boolean(lookup?.exists) });
+        return;
+      }
+
+      try {
+        const skinRes = await fetch(`${base}${lookup.skin}`, { signal: AbortSignal.timeout(8000) });
+        if (!skinRes.ok) throw new Error(`skin_http_${skinRes.status}`);
+        const contentType = skinRes.headers.get('content-type') || 'image/png';
+        if (!contentType.includes('image')) throw new Error('skin_not_image');
+        const body = Buffer.from(await skinRes.arrayBuffer());
+        skinCache.set(key, { expiresAt: Date.now() + SKIN_TTL_MS, contentType, body });
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.send(body);
+        return;
+      } catch {
+        skinMissingCache.set(key, Date.now() + SKIN_MISS_TTL_MS);
+        res.status(404).json({ error: 'skin_not_found' });
+        return;
+      }
+    }),
+  );
 
   return router;
 }

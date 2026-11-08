@@ -5,6 +5,7 @@ import { get, toList } from '../lib/api';
 import {
   Avatar,
   Badge,
+  Btn,
   Card,
   CardHead,
   Empty,
@@ -14,6 +15,7 @@ import {
   StatCard,
   TierChip,
 } from '../components/ui';
+import { PosterModal } from '../components/PosterModal';
 import { MatchCard } from '../components/cards';
 import { AreaTrendChart } from '../components/Charts';
 import { fmtDate, fmtDateTime, fmtNum, fmtRate } from '../lib/format';
@@ -23,6 +25,7 @@ export function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
   const [matchPage, setMatchPage] = useState(1);
+  const [posterOpen, setPosterOpen] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['player', userId],
@@ -90,6 +93,11 @@ export function PlayerPage() {
                 永久历史段位
               </span>
               <TierChip tier={data.lifetimeTier} />
+            </div>
+            <div className="row mt-12">
+              <Btn variant="outline" size="sm" onClick={() => setPosterOpen(true)}>
+                生成个人海报
+              </Btn>
             </div>
           </div>
           <div className="stat-inline">
@@ -335,6 +343,29 @@ export function PlayerPage() {
           </>
         )}
       </Card>
+
+      <PosterModal
+        open={posterOpen}
+        onClose={() => setPosterOpen(false)}
+        data={{
+          nickname: user.nickname || user.username || `玩家 ${user.id}`,
+          gameId: user.gameId,
+          username: user.username,
+          seasonName: data.seasons?.[0]?.seasonName ?? null,
+          tierName: stats.tier?.name ?? data.lifetimeTier?.name ?? null,
+          tierColor: stats.tier?.color ?? data.lifetimeTier?.color ?? null,
+          points: stats.points ?? lifetime.totalPoints ?? null,
+          rank: stats.rank ?? null,
+          matches: stats.matches ?? lifetime.matches ?? 0,
+          wins: stats.wins ?? 0,
+          winRate: stats.winRate ?? null,
+          kills: stats.kills ?? 0,
+          deaths: stats.deaths ?? 0,
+          bedsBroken: stats.bedsBroken ?? 0,
+          bestStreak: stats.bestStreak ?? records.bestStreak ?? 0,
+          maxKills: records.maxKills ?? 0,
+        }}
+      />
     </div>
   );
 }

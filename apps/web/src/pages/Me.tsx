@@ -20,6 +20,7 @@ import {
   TierChip,
 } from '../components/ui';
 import { MatchCard } from '../components/cards';
+import { PosterModal } from '../components/PosterModal';
 import { EmailVerifyBox } from '../components/EmailVerify';
 import { AreaTrendChart } from '../components/Charts';
 import { fmtDate, fmtDateTime, fmtNum, fmtRate } from '../lib/format';
@@ -30,6 +31,7 @@ function MeInner() {
   const toast = useToast();
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [posterOpen, setPosterOpen] = useState(false);
   const [gameId, setGameId] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -110,6 +112,9 @@ function MeInner() {
                 管理后台
               </Link>
             ) : null}
+            <Btn variant="primary" size="sm" onClick={() => setPosterOpen(true)}>
+              生成个人海报
+            </Btn>
           </>
         }
       />
@@ -373,6 +378,29 @@ function MeInner() {
           </Field>
         </div>
       </Modal>
+
+      <PosterModal
+        open={posterOpen}
+        onClose={() => setPosterOpen(false)}
+        data={{
+          nickname: profileUser?.nickname || profileUser?.username || '未命名玩家',
+          gameId: profileUser?.gameId,
+          username: profileUser?.username,
+          seasonName: data?.seasons?.[0]?.seasonName ?? null,
+          tierName: stats.tier?.name ?? data?.lifetimeTier?.name ?? null,
+          tierColor: stats.tier?.color ?? data?.lifetimeTier?.color ?? null,
+          points: stats.points ?? lifetime.totalPoints ?? null,
+          rank: stats.rank ?? null,
+          matches: stats.matches ?? lifetime.matches ?? 0,
+          wins: stats.wins ?? 0,
+          winRate: stats.winRate ?? null,
+          kills: stats.kills ?? 0,
+          deaths: stats.deaths ?? 0,
+          bedsBroken: stats.bedsBroken ?? 0,
+          bestStreak: stats.bestStreak ?? data?.records?.bestStreak ?? 0,
+          maxKills: data?.records?.maxKills ?? 0,
+        }}
+      />
     </div>
   );
 }
