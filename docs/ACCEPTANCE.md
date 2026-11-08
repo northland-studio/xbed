@@ -2,7 +2,7 @@
 
 > 更新时间：2026-11-08
 > 生产地址：https://xbed.xuanjian.top
-> 环境：HK `64.90.13.2` / XBed 起床战争服 `189.105.72.119`
+> 环境：HK `64.90.13.2`（网站/API）/ S1 比赛服 `189.105.72.119` / 115 服 `115.190.153.44`
 
 ## 1. 线上状态
 
@@ -12,9 +12,11 @@
 | API | `GET /api/health` → `{"ok":true,"db":"ok"}` |
 | 源站 TLS | Let's Encrypt 证书已签发（到期 2027-02-05，certbot 自动续期） |
 | 进程 | pm2 `xbed-api`（Node 20，独立目录 /var/www/xbed，独立 SQLite） |
-| 数据库 | 39 表 WAL，赛季 S1、14 条段位、服务器 s1 密钥、默认公告 |
+| 数据库 | 40 表 WAL，赛季 S1、14 条段位、服务器 s1/s2 密钥、默认公告 |
 | 赛季状态 | **S1 = registration（报名中）**，报名窗口 2026-11-24 ~ 2027-01-07 |
-| 服务器插件 | XBedSync **1.0.1** 已装并启用，`/xbedsync ping` → `GET /api/ingest/ping` 200 |
+| S1 比赛服（189） | 已重置为原始 zip 初始态 + **仅** XBedSync 1.0.1（serverKey=s1），25 张竞技场加载正常 |
+| 115 服（115） | 保持原有配置不变 + **仅** 新增 XBedSync 1.0.1（serverKey=s2），25 张竞技场加载正常 |
+| 上报链路 | `GET /api/ingest/ping` 对 s1 / s2 均返回 `{"ok":true}` |
 
 ## 2. 关键链路实测证据
 
