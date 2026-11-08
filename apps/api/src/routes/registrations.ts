@@ -6,7 +6,7 @@ import { errors } from '../lib/errors.js';
 import { createNotification } from '../lib/notifications.js';
 import { listResponse, parseId, parsePagination } from '../lib/pagination.js';
 import { parseJson, registrationPublic } from '../lib/serialize.js';
-import { getSeason, seasonIsRegistrationOpen } from '../lib/season.js';
+import { getSeason, seasonIsRegistrationOpen, seasonStateLabel } from '../lib/season.js';
 import { getSettingBool } from '../lib/settings.js';
 import { nowIso } from '../lib/time.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -84,7 +84,7 @@ export function createRegistrationsRouter(ctx: AppContext): Router {
       throw errors.emailUnverified();
     }
     if (!seasonIsRegistrationOpen(season)) {
-      throw errors.registrationClosed(`当前赛季状态为 ${season.state}，报名未开放`);
+      throw errors.registrationClosed(`当前赛季为「${seasonStateLabel(season.state)}」，报名未开放（报名时间未到或已结束）`);
     }
 
     const fields = db

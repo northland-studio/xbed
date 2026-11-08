@@ -197,4 +197,47 @@ describe('赛季报名', () => {
       .send({ gameId: 'ChangedID' });
     expect(blocked.status).toBe(403);
   });
+
+  it('报名期内即使赛季 start_at 在未来，也允许报名（回归：S1 报名被误拒）', async () => {
+    const user = createUser(ctx.db, {
+      nickname: '提前报名',
+      gameId: 'EarlyBird',
+      email: 'early@example.com',
+      emailVerified: true,
+    });
+    const { cookie } = createSessionFor(ctx.db, user);
+
+    const future = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+    const end = new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString();
+    ctx.db
+      .prepare("UPDATE seasons SET state = 'registration', registration_open = 1, start_at = ?, end_at = ? WHERE id = ?")
+      .run(future, end, ctx.seed.seasonId);
+
+    const res = await request(ctx.app)
+      .post(`/api/seasons/${ctx.seed.seasonId}/register`)
+      .set('Cookie', cookie)
+      .send({ gameId: 'EarlyBird' });
+    expect(res.status).toBe(200);
+    expect(res.body.registration.state).toBe('active');
+  });
+
+  it('报名已关闭（registration_open=0）→ 403 registration_closed', async () => {
+    const user = createUser(ctx.db, {
+      nickname: '关窗',
+      gameId: 'ClosedUser',
+      email: 'closed@example.com',
+      emailVerified: true,
+    });
+    const { cookie } = createSessionFor(ctx.db, user);
+    ctx.db
+      .prepare("UPDATE seasons SET state = 'registration', registration_open = 0 WHERE id = ?")
+      .run(ctx.seed.seasonId);
+
+    const res = await request(ctx.app)
+      .post(`/api/seasons/${ctx.seed.seasonId}/register`)
+      .set('Cookie', cookie)
+      .send({ gameId: 'ClosedUser' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('registration_closed');
+  });
 });

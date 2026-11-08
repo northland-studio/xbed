@@ -35,9 +35,23 @@ export function seasonIsRegistrationOpen(season: SeasonRow | null | undefined, n
   if (!season) return false;
   if (season.state !== 'registration' && season.state !== 'running') return false;
   if (season.registration_open !== 1) return false;
-  if (season.start_at && Date.parse(season.start_at) > now) return false;
+  // 报名期本来就是「赛季开始前」的窗口，因此 registration 状态下不限制 start_at 之前
+  // （start_at 是比赛/赛季正式开始时间，报名应在其之前开放）
+  if (season.state === 'running' && season.start_at && Date.parse(season.start_at) > now) return false;
   if (season.end_at && Date.parse(season.end_at) < now) return false;
   return true;
+}
+
+/** 赛季状态的中文名称（用于提示文案） */
+export function seasonStateLabel(state: string): string {
+  const map: Record<string, string> = {
+    draft: '草稿',
+    registration: '报名中',
+    running: '进行中',
+    sealed: '已封存',
+    archived: '已归档',
+  };
+  return map[state] ?? state;
 }
 
 export function listSeasons(db: DB, options: { includeDrafts?: boolean } = {}): SeasonRow[] {
