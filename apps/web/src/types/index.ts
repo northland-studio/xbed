@@ -184,6 +184,13 @@ export interface Match {
   events?: MatchEvent[];
   playerCount?: number;
   evidenceDeadline?: string | null;
+  /** 是否为已公布赛果（仅参赛玩家/管理员能看到未公布比赛） */
+  published?: boolean;
+  /** 当前查看者是否为该场参赛玩家 */
+  viewerIsParticipant?: boolean;
+  /** 我与该场比赛的证据提交状态（/me/profile 的 recentMatches 才有） */
+  logState?: EvidenceState;
+  replayState?: EvidenceState;
 }
 
 export type MatchState =

@@ -69,4 +69,43 @@ describe('比赛详情（含事件时间线）', () => {
     expect(detail.status).toBe(200);
     expect(detail.body.events).toEqual([]);
   });
+
+  it('未公布比赛：游客 404 / 参赛玩家 200 / 管理员 200', async () => {
+    const player = createUser(ctx.db, { gameId: 'EvidenceGuy', nickname: '证据玩家' });
+    const playerCookie = createSessionFor(ctx.db, player).cookie;
+    const payload = sampleMatchPayload({
+      players: [
+        {
+          uuid: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          gameId: 'EvidenceGuy',
+          team: '红队',
+          isWinner: true,
+          kills: 4,
+          finalKills: 1,
+          deaths: 1,
+          finalDeaths: 0,
+          bedsBroken: 1,
+          placement: 1,
+        },
+      ],
+      events: [],
+    });
+    const ingest = await ingestMatch(ctx, payload);
+    expect(ingest.status).toBe(200);
+    const matchId = ingest.body.matchId as number;
+    // 确保比赛仍是未公布状态
+    ctx.db.prepare("UPDATE matches SET state = 'pending' WHERE id = ?").run(matchId);
+
+    const guest = await request(ctx.app).get(`/api/matches/${matchId}`);
+    expect(guest.status).toBe(404);
+
+    const participant = await request(ctx.app).get(`/api/matches/${matchId}`).set('Cookie', playerCookie);
+    expect(participant.status).toBe(200);
+    expect(participant.body.published).toBe(false);
+    expect(participant.body.viewerIsParticipant).toBe(true);
+    expect(participant.body.state).toBe('pending');
+
+    const admin = await request(ctx.app).get(`/api/matches/${matchId}`).set('Cookie', adminCookie);
+    expect(admin.status).toBe(200);
+  });
 });

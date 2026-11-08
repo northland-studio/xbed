@@ -609,11 +609,19 @@ export function MatchDetailPage() {
               </div>
             </div>
           </Card>
-          <EvidencePanel matchId={matchId} endedAt={match.endedAt} />
-          <AppealPanel matchId={matchId} endedAt={match.endedAt} />
+          {match.viewerIsParticipant ? <EvidencePanel matchId={matchId} endedAt={match.endedAt} /> : null}
+          {match.state === 'approved' || match.state === 'resolved' ? (
+            <AppealPanel matchId={matchId} endedAt={match.endedAt} />
+          ) : null}
           <Card>
             <CardHead title="说明" />
             <div className="card-body tight">
+              {match.state !== 'approved' && match.state !== 'resolved' ? (
+                <p className="warn" style={{ fontSize: 11.5, lineHeight: 1.8, marginBottom: 8 }}>
+                  该场比赛尚未公布赛果（当前状态：{label(MATCH_STATE, match.state)}），仅参赛玩家与管理员可见。
+                  请先提交 latest.log / .mcpr 证据，管理员审核通过后赛果才会正式公布并进入统计。
+                </p>
+              ) : null}
               <p className="dim" style={{ fontSize: 11.5, lineHeight: 1.8 }}>
                 本页展示的赛果均来自审核通过的正式数据。服务器原始日志、其他玩家的 latest.log 与 .mcpr 回放文件不向普通玩家开放。
               </p>

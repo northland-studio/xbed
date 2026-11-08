@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AppContext } from '../app.js';
 import type {
   LifetimeStatisticsRow,
+  MatchRow,
   PlayerStatisticsRow,
   RegistrationRow,
   UserRow,
@@ -13,7 +14,8 @@ import { verificationCodeEmail, sendMail } from '../lib/mailer.js';
 import { listNotifications, unreadNotificationCount } from '../lib/notifications.js';
 import { listResponse, parsePagination } from '../lib/pagination.js';
 import { notificationPublic, publicUser, registrationPublic, tierBrief } from '../lib/serialize.js';
-import { getCurrentSeason } from '../lib/season.js';
+import { getCurrentSeason, getSeason } from '../lib/season.js';
+import { getSettingNumber } from '../lib/settings.js';
 import { getLifetimeTier, getSeasonTier } from '../lib/tiers.js';
 import { addHours, addMinutes, nowIso } from '../lib/time.js';
 import { asyncRoute } from '../middleware/error.js';
@@ -136,6 +138,63 @@ export function createMeRouter(ctx: AppContext): Router {
     const currentTier = current ? getSeasonTier(db, current.id, currentStats?.points ?? current.initial_points) : null;
     const lifetimeTier = getLifetimeTier(db, lifetimeRow.total_points);
 
+    // 我的比赛（含未公布赛果的场次）：参赛玩家需要能看到待审核比赛并提交证据
+    const recentMatches = db
+      .prepare(
+        `SELECT m.*, mp.kills, mp.deaths, mp.is_winner, mp.team AS player_team, mp.placement,
+                mp.final_kills, mp.final_deaths, mp.beds_broken,
+                ml.state AS log_state, mr.state AS replay_state
+           FROM match_players mp
+           JOIN matches m ON m.id = mp.match_id
+           LEFT JOIN match_logs ml ON ml.match_id = m.id AND ml.user_id = mp.user_id
+           LEFT JOIN match_replays mr ON mr.match_id = m.id AND mr.user_id = mp.user_id
+          WHERE mp.user_id = ?
+          ORDER BY COALESCE(m.ended_at, m.created_at) DESC, m.id DESC LIMIT 20`,
+      )
+      .all(user.id) as Array<
+      MatchRow & {
+        kills: number;
+        deaths: number;
+        is_winner: number;
+        player_team: string | null;
+        placement: number | null;
+        final_kills: number;
+        final_deaths: number;
+        beds_broken: number;
+        log_state: string | null;
+        replay_state: string | null;
+      }
+    >;
+    const evidenceDeadlineMinutes =
+      getSettingNumber(db, 'evidence_deadline_minutes', config.limits.evidenceDeadlineMinutes) ?? 60;
+    const myMatches = recentMatches.map((row) => ({
+      id: row.id,
+      seasonId: row.season_id,
+      season: row.season_id ? { id: row.season_id, name: getSeason(db, row.season_id)?.name ?? '' } : null,
+      arena: row.arena,
+      arenaDisplay: row.arena_display,
+      mode: row.mode,
+      state: row.state,
+      startedAt: row.started_at,
+      endedAt: row.ended_at,
+      winnerTeam: row.winner_team,
+      isDraw: row.is_draw === 1,
+      endReason: row.end_reason,
+      kills: row.kills,
+      deaths: row.deaths,
+      isWinner: row.is_winner === 1,
+      team: row.player_team,
+      placement: row.placement,
+      finalKills: row.final_kills,
+      finalDeaths: row.final_deaths,
+      bedsBroken: row.beds_broken,
+      logState: row.log_state ?? 'missing',
+      replayState: row.replay_state ?? 'missing',
+      evidenceDeadline: row.ended_at
+        ? new Date(Date.parse(row.ended_at) + evidenceDeadlineMinutes * 60_000).toISOString()
+        : null,
+    }));
+
     res.status(200).json({
       user: publicUser(user, { includePrivate: true }),
       email: user.email,
@@ -147,6 +206,7 @@ export function createMeRouter(ctx: AppContext): Router {
       registrations: registrations.map((row) =>
         registrationPublic(row, { seasonName: row.season_name }),
       ),
+      recentMatches: myMatches,
       stats: currentStats
         ? {
             seasonId: current!.id,

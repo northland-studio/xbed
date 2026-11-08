@@ -231,7 +231,7 @@ function MeInner() {
               }
             />
             {!data?.recentMatches?.length ? (
-              <Empty text="暂无比赛记录" extra="参加审核通过的正式比赛后会出现在这里。" />
+              <Empty text="暂无比赛记录" extra="参加正式比赛后会出现在这里；赛果未公布时也可进入比赛详情提交证据。" />
             ) : (
               <div>
                 {data.recentMatches.map((m) => (

@@ -173,7 +173,18 @@ export function createPublicRouter(ctx: AppContext): Router {
     const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(parseId(req.params.id, '比赛 ID')) as
       | MatchRow
       | undefined;
-    if (!match || !['approved', 'resolved'].includes(match.state)) {
+    if (!match) throw errors.notFound('比赛不存在或尚未公布');
+    const published = ['approved', 'resolved'].includes(match.state);
+    const viewerId = req.auth?.user.id ?? null;
+    // 未公布（待审核 / 异常 / 已拒绝）的比赛只对参赛玩家本人与管理员可见，
+    // 否则参赛玩家在赛果公布前无法进入详情页提交证据。
+    const viewerIsParticipant = viewerId
+      ? Boolean(
+          db.prepare('SELECT 1 FROM match_players WHERE match_id = ? AND user_id = ?').get(match.id, viewerId),
+        )
+      : false;
+    const viewerIsAdmin = Boolean(req.auth && req.auth.user.level >= 1);
+    if (!published && !viewerIsParticipant && !viewerIsAdmin) {
       throw errors.notFound('比赛不存在或尚未公布');
     }
     const players = db
@@ -184,15 +195,17 @@ export function createPublicRouter(ctx: AppContext): Router {
       .all(match.id) as MatchEventRow[];
     const nicknames = nicknameMap(db, players.map((player) => player.user_id));
     const season = match.season_id ? getSeason(db, match.season_id) : null;
-    res.status(200).json(
-      matchPublic(match, {
+    res.status(200).json({
+      ...matchPublic(match, {
         players,
         events,
         nicknames,
         season: season ? { id: season.id, name: season.name, code: season.code } : null,
-        hasResult: true,
+        hasResult: published,
       }),
-    );
+      published,
+      viewerIsParticipant,
+    });
   });
 
   router.get('/players/:userId', (req, res) => {

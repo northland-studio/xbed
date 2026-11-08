@@ -1,7 +1,17 @@
 import { Link } from 'react-router-dom';
 import type { Announcement, Match, Season } from '../types';
 import { Badge, TierChip } from './ui';
-import { MATCH_STATE, MATCH_STATE_BADGE, SEASON_STATE, SEASON_STATE_BADGE, ANN_CATEGORY, label, badge } from '../lib/labels';
+import {
+  MATCH_STATE,
+  MATCH_STATE_BADGE,
+  SEASON_STATE,
+  SEASON_STATE_BADGE,
+  ANN_CATEGORY,
+  EVIDENCE_STATE,
+  EVIDENCE_STATE_BADGE,
+  label,
+  badge,
+} from '../lib/labels';
 import { fmtDateTime, fmtMonthDay, fmtNum, fmtRange, matchDuration } from '../lib/format';
 
 /** 比赛卡片：首页 / 比赛列表 / 玩家档案共用 */
@@ -15,6 +25,9 @@ export function MatchCard({ match }: { match: Match }) {
         <div className="match-title">
           <span>{title}</span>
           <Badge kind={badge(MATCH_STATE_BADGE, state)}>{label(MATCH_STATE, state)}</Badge>
+          {state !== 'approved' && state !== 'resolved' && (match.logState ?? 'missing') === 'missing' ? (
+            <span className="tag">待提交证据</span>
+          ) : null}
           {match.isDraw ? <span className="tag">平局</span> : null}
         </div>
         <div className="match-meta">
@@ -22,6 +35,17 @@ export function MatchCard({ match }: { match: Match }) {
           {match.mode ? <span>{match.mode}</span> : null}
           <span>{fmtDateTime(match.startedAt || match.submittedAt)}</span>
           <span>时长 {matchDuration(match.startedAt, match.endedAt)}</span>
+          {match.logState || match.replayState ? (
+            <span>
+              证据：
+              <Badge kind={badge(EVIDENCE_STATE_BADGE, match.logState ?? 'missing')}>
+                日志 {label(EVIDENCE_STATE, match.logState ?? 'missing')}
+              </Badge>{' '}
+              <Badge kind={badge(EVIDENCE_STATE_BADGE, match.replayState ?? 'missing')}>
+                回放 {label(EVIDENCE_STATE, match.replayState ?? 'missing')}
+              </Badge>
+            </span>
+          ) : null}
         </div>
       </div>
       <div className="match-side">
