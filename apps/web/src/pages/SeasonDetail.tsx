@@ -80,7 +80,9 @@ function RulesBlock({ detail }: { detail: SeasonDetail }) {
 
 function RegisterCard({ detail, myReg }: { detail: SeasonDetail; myReg?: Registration | null }) {
   const { isLoggedIn } = useAuth();
-  const registerOpen = detail.state === 'registration' && detail.registrationOpen !== false;
+  const registerOpen =
+    (detail.state === 'registration' || detail.state === 'running') && detail.registrationOpen !== false;
+  const isLateRegister = detail.state === 'running';
 
   let body;
   if (myReg) {
@@ -113,7 +115,7 @@ function RegisterCard({ detail, myReg }: { detail: SeasonDetail; myReg?: Registr
   } else if (!registerOpen) {
     body = (
       <Alert kind="warn">
-        当前赛季报名未开放。{detail.state === 'running' ? '赛季已开始，报名窗口关闭。' : ''}
+        当前赛季报名未开放。{detail.state === 'running' ? '赛季进行中，但补报通道已关闭。' : ''}
       </Alert>
     );
   } else if (!isLoggedIn) {
@@ -134,10 +136,12 @@ function RegisterCard({ detail, myReg }: { detail: SeasonDetail; myReg?: Registr
     body = (
       <>
         <p className="muted" style={{ fontSize: 13, lineHeight: 1.8 }}>
-          报名窗口开放中。填写游戏 ID 与赛季自定义字段后即可提交，符合资格将立即通过。
+          {isLateRegister
+            ? '赛季已开始，当前为补报：报名后只统计后续完成的正式比赛，补报前的比赛不计入成绩。'
+            : '报名窗口开放中。填写游戏 ID 与赛季自定义字段后即可提交，符合资格将立即通过。'}
         </p>
         <Link to={`/seasons/${detail.id}/register`} className="btn btn-primary btn-block mt-12">
-          立即报名
+          {isLateRegister ? '补报参赛' : '立即报名'}
         </Link>
       </>
     );
@@ -189,6 +193,10 @@ export function SeasonDetailPage() {
 
   const myReg = myRegistrations?.items.find((r) => r.seasonId === seasonId) ?? null;
 
+  const canRegister =
+    (detail?.state === 'registration' || detail?.state === 'running') && detail?.registrationOpen !== false;
+  const isLateRegister = detail?.state === 'running';
+
   if (isLoading) {
     return (
       <div className="container">
@@ -229,9 +237,9 @@ export function SeasonDetailPage() {
             <Link to="/seasons" className="btn btn-ghost btn-sm">
               返回赛事中心
             </Link>
-            {detail.state === 'registration' && detail.registrationOpen !== false ? (
+            {canRegister ? (
               <Link to={`/seasons/${detail.id}/register`} className="btn btn-primary btn-sm">
-                报名参赛
+                {isLateRegister ? '补报参赛' : '报名参赛'}
               </Link>
             ) : null}
           </>

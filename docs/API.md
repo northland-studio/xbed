@@ -70,6 +70,16 @@ Base: `https://xbed.xuanjian.top/api`（开发 `http://127.0.0.1:3939/api`）
 | GET | `/me/registrations` | 我的报名记录 |
 | POST | `/me/registrations/:id/withdraw` | 退出报名（开赛后禁止） |
 
+### 补报规则（S1）
+
+- 报名是否开放只看两个条件：赛季 `state ∈ {registration, running}` 且 `registration_open=1`、未过 `end_at`；**赛季开始后仍可报名（补报）**，由 `registration_open` 统一开关（后台赛季编辑页可随时关闭）。
+- 补报**不追溯**：只有「报名时间 ≤ 比赛开始时间」的比赛才会把玩家关联到 `match_players.user_id`；
+  报名之前的比赛保持 `user_id = NULL`，不结算积分、不计入个人统计。
+- 补报玩家初始积分仍为赛季 `initial_points`（S1 为 60），可正常参与后续对局排行。
+- 无赛季（`abnormal/no_season`）的比赛不会关联任何玩家；管理员通过 `POST /admin/matches/:id/season`
+  指定赛季后，会按同一规则重新尝试关联玩家。
+
+
 ## 证据上传（玩家）
 
 | 方法 | 路径 | 说明 |

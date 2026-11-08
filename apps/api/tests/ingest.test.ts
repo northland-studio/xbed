@@ -218,6 +218,48 @@ describe('服务器上报 HMAC', () => {
     expect(match.abnormal_reason).toBe('no_season');
   });
 
+  it('补报玩家报名之前的比赛不追溯关联（user_id 为空）', async () => {
+    // 新玩家：未报名就打了这场比赛
+    createUser(ctx.db, { gameId: 'LateJoiner', nickname: '补报玩家' });
+    const payload = sampleMatchPayload({
+      players: [
+        {
+          uuid: crypto.randomUUID(),
+          gameId: 'LateJoiner',
+          team: '红队',
+          isWinner: true,
+          kills: 5,
+          finalKills: 1,
+          deaths: 1,
+          finalDeaths: 0,
+          bedsBroken: 1,
+          placement: 1,
+        },
+      ],
+    });
+    const ingest = await ingestMatch(ctx, payload, { skipParticipantRegistration: true });
+    expect(ingest.status).toBe(200);
+    expect(ingest.body.linkedPlayers).toBe(0);
+
+    const row = ctx.db
+      .prepare('SELECT user_id FROM match_players WHERE match_id = ? AND game_id = ?')
+      .get(ingest.body.matchId, 'LateJoiner') as { user_id: number | null };
+    expect(row.user_id).toBeNull();
+
+    // 报名时间晚于比赛开始 → 仍不追溯关联
+    const user = ctx.db.prepare("SELECT id FROM users WHERE game_id = 'LateJoiner'").get() as { id: number };
+    ctx.db
+      .prepare(
+        `INSERT OR IGNORE INTO registrations (season_id, user_id, game_id, custom_data, state, created_at)
+         VALUES (?, ?, 'LateJoiner', '{}', 'active', ?)`,
+      )
+      .run(ctx.seed.seasonId, user.id, new Date().toISOString());
+    const row2 = ctx.db
+      .prepare('SELECT user_id FROM match_players WHERE match_id = ? AND game_id = ?')
+      .get(ingest.body.matchId, 'LateJoiner') as { user_id: number | null };
+    expect(row2.user_id).toBeNull();
+  });
+
   it('被吊销的服务器密钥 → 401', async () => {
     ctx.db.prepare("UPDATE servers SET state = 'revoked' WHERE server_key = 's1'").run();
     const payload = sampleMatchPayload({ players: makePlayers('Steve', 'Alex') });

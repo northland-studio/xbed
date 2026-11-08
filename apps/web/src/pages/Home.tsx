@@ -251,9 +251,9 @@ function CurrentSeasonSection() {
                     赛季详情
                   </Link>
                   {detail?.fields?.length ? <span className="tag">含 {detail.fields.length} 项自定义报名字段</span> : null}
-                  {current.registrationOpen !== false && current.state === 'registration' ? (
+                  {current.registrationOpen !== false && (current.state === 'registration' || current.state === 'running') ? (
                     <Link to={`/seasons/${current.id}/register`} className="btn btn-primary btn-sm">
-                      立即报名
+                      {current.state === 'running' ? '补报参赛' : '立即报名'}
                     </Link>
                   ) : null}
                 </div>
@@ -268,6 +268,8 @@ function CurrentSeasonSection() {
                     <span className="v">
                       {current.state === 'registration' && current.registrationOpen !== false ? (
                         <Badge kind="green">开放中</Badge>
+                      ) : current.state === 'running' && current.registrationOpen !== false ? (
+                        <Badge kind="green">补报开放</Badge>
                       ) : current.state === 'draft' ? (
                         <Badge kind="gray">未开放</Badge>
                       ) : (

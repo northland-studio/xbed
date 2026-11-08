@@ -67,7 +67,8 @@ export function AnnouncementRow({ item }: { item: Announcement }) {
 /** 赛季卡片 */
 export function SeasonCard({ season }: { season: Season }) {
   const state = season.state ?? 'draft';
-  const regOpen = state === 'registration' && season.registrationOpen !== false;
+  const regOpen = (state === 'registration' || state === 'running') && season.registrationOpen !== false;
+  const isLate = state === 'running';
   return (
     <Link to={`/seasons/${season.id}`} className="card hoverable" style={{ display: 'block', padding: 22 }}>
       <div className="row-between" style={{ marginBottom: 12 }}>
@@ -96,11 +97,11 @@ export function SeasonCard({ season }: { season: Season }) {
       </div>
       <div className="row mt-16">
         {regOpen ? (
-          <span className="btn btn-primary btn-sm">立即报名</span>
+          <span className="btn btn-primary btn-sm">{isLate ? '补报参赛' : '立即报名'}</span>
         ) : (
           <span className="btn btn-ghost btn-sm">查看详情</span>
         )}
-        {season.registrationOpen !== false ? <span className="tag">报名开放</span> : null}
+        {regOpen ? <span className="tag">{isLate ? '补报开放' : '报名开放'}</span> : null}
       </div>
     </Link>
   );

@@ -327,15 +327,25 @@ export function createIngestRouter(ctx: AppContext): Router {
       );
       const linkedUserIds = new Set<number>();
       const seenGameIds = new Set<string>();
+      // 只关联「比赛开始前已完成报名」的玩家：
+      // 补报玩家报名之前的比赛不追溯计入，避免补报后把历史对局刷进统计。
       const findUser = db.prepare(
-        "SELECT * FROM users WHERE lower(game_id) = lower(?) AND status = 'active' LIMIT 1",
+        `SELECT u.* FROM users u
+           JOIN registrations r
+             ON r.user_id = u.id AND r.season_id = ? AND r.state = 'active'
+          WHERE lower(u.game_id) = lower(?) AND u.status = 'active'
+            AND r.created_at <= ?
+          LIMIT 1`,
       );
+      const linkStartedAt = payload.startedAt ?? nowIso();
 
       for (const player of payload.players) {
         const key = player.gameId.toLowerCase();
         if (seenGameIds.has(key)) continue;
         seenGameIds.add(key);
-        const matchedUser = findUser.get(player.gameId) as UserRow | undefined;
+        const matchedUser = matchSeason
+          ? (findUser.get(matchSeason.id, player.gameId, linkStartedAt) as UserRow | undefined)
+          : undefined;
         if (matchedUser) linkedUserIds.add(matchedUser.id);
         const extras: Record<string, unknown> = {};
         for (const [field, value] of Object.entries(player)) {

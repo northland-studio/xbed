@@ -73,7 +73,8 @@ function RegisterInner() {
     [fields, custom],
   );
 
-  const open = season?.state === 'registration' && season.registrationOpen !== false;
+  const open = (season?.state === 'registration' || season?.state === 'running') && season.registrationOpen !== false;
+  const isLate = season?.state === 'running';
 
   const submit = async () => {
     if (!effectiveGameId.trim()) {
@@ -170,7 +171,7 @@ function RegisterInner() {
           <div className="card-body">
             <Alert kind="warn">
               当前赛季报名未开放（状态：{label(SEASON_STATE, season.state)}）。
-              {season.state === 'running' ? '赛季已开始，报名窗口已关闭。' : '请关注赛事公告获取报名开放时间。'}
+              {season.state === 'running' ? '赛季进行中，但补报通道已关闭。' : '请关注赛事公告获取报名开放时间。'}
             </Alert>
             <div className="mt-16">
               <Link to={`/seasons/${seasonId}`} className="btn btn-outline btn-sm">
@@ -182,8 +183,14 @@ function RegisterInner() {
       ) : (
         <div className="grid grid-side">
           <Card>
-            <CardHead title="报名信息" />
+            <CardHead title={isLate ? '补报信息' : '报名信息'} />
             <div className="card-body">
+              {isLate ? (
+                <Alert kind="warn">
+                  赛季已开始，当前报名属于<strong>补报</strong>。补报只统计报名之后完成的正式比赛，补报前的比赛不计入个人成绩；
+                  初始积分仍为 {season.initialPoints} 分，仍可正常参与后续对局排行。
+                </Alert>
+              ) : null}
               <div className="stack">
                 <Field
                   label="Minecraft 游戏 ID"

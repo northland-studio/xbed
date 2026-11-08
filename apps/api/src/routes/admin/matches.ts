@@ -331,6 +331,18 @@ export function createMatchesAdminRouter(ctx: AppContext): Router {
       new Date().toISOString(),
       match.id,
     );
+    // 归属赛季后重新关联玩家（只关联比赛开始前已完成报名的玩家）
+    db.prepare(
+      `UPDATE match_players SET user_id = (
+         SELECT u.id FROM users u
+           JOIN registrations r
+             ON r.user_id = u.id AND r.season_id = ? AND r.state = 'active'
+          WHERE lower(u.game_id) = lower(match_players.game_id)
+            AND u.status = 'active'
+            AND r.created_at <= ?
+          LIMIT 1)
+       WHERE match_id = ? AND user_id IS NULL`,
+    ).run(season.id, match.started_at ?? new Date().toISOString(), match.id);
     auditFromRequest(db, req, {
       action: 'match.assign_season',
       targetType: 'match',

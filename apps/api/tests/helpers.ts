@@ -250,6 +250,39 @@ export function sampleMatchPayload(options: SamplePayloadOptions = {}): Record<s
   };
 }
 
+/**
+ * 测试辅助：让 payload 中的玩家在比赛开始前就已完成报名。
+ * 生产逻辑只把「赛前已报名」的玩家关联到比赛，测试里统一在此补上报名记录，
+ * 避免每个用例重复写报名步骤。
+ */
+export function ensureParticipantsRegistered(
+  ctx: TestContext,
+  payload: Record<string, unknown>,
+  seasonId: number,
+): void {
+  const startedAtRaw = payload.startedAt;
+  const startedAt = typeof startedAtRaw === 'string' ? Date.parse(startedAtRaw) : Date.now();
+  const registeredAt = new Date((Number.isFinite(startedAt) ? startedAt : Date.now()) - 86_400_000).toISOString();
+  const players = Array.isArray(payload.players) ? (payload.players as Array<{ gameId?: string }>) : [];
+  for (const player of players) {
+    if (!player?.gameId) continue;
+    const user = ctx.db
+      .prepare("SELECT id FROM users WHERE lower(game_id) = lower(?) AND status = 'active' LIMIT 1")
+      .get(player.gameId) as { id: number } | undefined;
+    if (!user) continue;
+    ctx.db
+      .prepare(
+        `INSERT OR IGNORE INTO registrations (season_id, user_id, game_id, custom_data, state, created_at)
+         VALUES (?, ?, ?, '{}', 'active', ?)`,
+      )
+      .run(seasonId, user.id, player.gameId, registeredAt);
+    // 测试用例里报名时间通常是「现在」，而模拟比赛开始于过去；统一回填为赛前，保证可关联
+    ctx.db
+      .prepare('UPDATE registrations SET created_at = ? WHERE season_id = ? AND user_id = ?')
+      .run(registeredAt, seasonId, user.id);
+  }
+}
+
 export async function ingestMatch(
   ctx: TestContext,
   payload: Record<string, unknown>,
@@ -259,8 +292,15 @@ export async function ingestMatch(
     nonce?: string;
     serverKey?: string;
     signature?: string;
+    skipParticipantRegistration?: boolean;
   } = {},
 ) {
+  const seasonRow = ctx.db
+    .prepare("SELECT id FROM seasons WHERE state = 'running' ORDER BY id DESC LIMIT 1")
+    .get() as { id: number } | undefined;
+  if (seasonRow && !options.skipParticipantRegistration) {
+    ensureParticipantsRegistered(ctx, payload, seasonRow.id);
+  }
   const body = JSON.stringify(payload);
   const secret = options.secret ?? serverSecret(ctx);
   const headers = signIngest(secret, {
