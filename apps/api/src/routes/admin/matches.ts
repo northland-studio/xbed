@@ -142,7 +142,7 @@ export function createMatchesAdminRouter(ctx: AppContext): Router {
       .prepare('SELECT * FROM match_players WHERE match_id = ? ORDER BY COALESCE(placement, 99), id')
       .all(matchId) as MatchPlayerRow[];
     const events = db
-      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY COALESCE(at, created_at), id')
+      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY (at IS NULL), at, id')
       .all(matchId) as MatchEventRow[];
     const nicknameById = new Map<number, string>();
     for (const player of players) {
@@ -396,7 +396,7 @@ export function createMatchesAdminRouter(ctx: AppContext): Router {
   router.get('/matches/:id/events', (req, res) => {
     const matchId = parseId(req.params.id, '比赛 ID');
     const events = db
-      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY COALESCE(at, created_at), id')
+      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY (at IS NULL), at, id')
       .all(matchId) as MatchEventRow[];
     res.status(200).json({ items: events.map(matchEventPublic), total: events.length });
   });

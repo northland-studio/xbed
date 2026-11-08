@@ -180,7 +180,7 @@ export function createPublicRouter(ctx: AppContext): Router {
       .prepare('SELECT * FROM match_players WHERE match_id = ? ORDER BY COALESCE(placement, 99), id')
       .all(match.id) as MatchPlayerRow[];
     const events = db
-      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY COALESCE(at, created_at), id')
+      .prepare('SELECT * FROM match_events WHERE match_id = ? ORDER BY (at IS NULL), at, id')
       .all(match.id) as MatchEventRow[];
     const nicknames = nicknameMap(db, players.map((player) => player.user_id));
     const season = match.season_id ? getSeason(db, match.season_id) : null;
