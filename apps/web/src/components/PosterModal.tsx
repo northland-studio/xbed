@@ -50,10 +50,28 @@ function drawSkinFront(ctx: CanvasRenderingContext2D, skin: HTMLImageElement | n
   const headH = 8 * unit;
   const bodyW = 8 * unit;
   const bodyH = 12 * unit;
-  const armW = 4 * unit;
-  const armH = 12 * unit;
   const legW = 4 * unit;
   const legH = 12 * unit;
+
+  // 判定经典/纤细（Slim）皮肤：经典皮肤手臂 4px 宽，(47,20) 有像素；纤细皮肤该处透明
+  let slim = false;
+  if (skin) {
+    try {
+      const off = document.createElement('canvas');
+      off.width = 64;
+      off.height = 64;
+      const octx = off.getContext('2d');
+      if (octx) {
+        octx.drawImage(skin, 0, 0);
+        slim = octx.getImageData(47, 20, 1, 1).data[3] === 0;
+      }
+    } catch {
+      slim = false;
+    }
+  }
+  const armCore = slim ? 3 : 4;
+  const armW = armCore * unit;
+  const armH = 12 * unit;
 
   const headX = cx - headW / 2;
   const bodyX = cx - bodyW / 2;
@@ -67,13 +85,13 @@ function drawSkinFront(ctx: CanvasRenderingContext2D, skin: HTMLImageElement | n
     part(20, 52, 4, 12, bodyX + legW, legY, legW, legH);
     // 身体
     part(20, 20, 8, 12, bodyX, bodyY, bodyW, bodyH);
-    // 手臂（左右镜像）
+    // 手臂（右侧镜像 + 左侧）
     ctx.save();
     ctx.translate(bodyX, armY);
     ctx.scale(-1, 1);
-    part(44, 20, 4, 12, -armW, 0, armW, armH);
+    part(44, 20, armCore, 12, -armW, 0, armW, armH);
     ctx.restore();
-    part(36, 52, 4, 12, bodyX + bodyW, armY, armW, armH);
+    part(36, 52, armCore, 12, bodyX + bodyW, armY, armW, armH);
     // 头 + 帽子层
     part(8, 8, 8, 8, headX, top, headW, headH);
     part(40, 8, 8, 8, headX, top, headW, headH);

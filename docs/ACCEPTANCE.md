@@ -20,6 +20,13 @@
 
 ## 2. 关键链路实测证据
 
+### 2.0 个人档案海报 + 玄剑官网皮肤
+
+- 官网新增只读接口：`GET https://www.xuanjian.top/api/skins/lookup?gameId=<游戏ID>`，返回 `{skin, gameId, username, exists}`；64×64 PNG，经 `https://www.xuanjian.top/uploads/skin-*.png` 可直接访问。
+- XBed 后端代理：`GET /api/skin/:gameId` → 服务端调用官网（生产走内网 `http://127.0.0.1:3000`）→ 缓存 24h → 返回 `image/png`；查无皮肤返回 404（负缓存 10 分钟）。
+  实测：`/api/skin/Morzane123` → 200 image/png 3332 bytes（64×64 RGBA）；未知用户 → 404；非法 ID → 404。
+- 前端：玩家档案页与个人中心新增「生成个人海报」，Canvas 生成 1080×1920 竖版 PNG（品牌背景 + 皮肤正面像 + 昵称/游戏ID + 段位积分 + 场次/胜率/胜场/击杀/破床/最高连胜 + 站点信息），支持一键下载；未上传皮肤时用默认 Steve 形象，并区分经典/纤细（Slim）皮肤比例。
+
 ### 2.1 玄剑 OAuth 真实登录（已在生产发生）
 
 ```
